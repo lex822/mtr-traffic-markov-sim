@@ -56,6 +56,42 @@
             color: #94a3b8;
         }
 
+        /* Leaderboard Styles */
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #1e293b;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            border: 1px solid #334155;
+        }
+
+        .leaderboard-rank {
+            font-weight: bold;
+            width: 20px;
+            color: #38bdf8;
+        }
+
+        .leaderboard-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #f8fafc;
+            font-weight: 500;
+        }
+
+        .leaderboard-count {
+            font-weight: bold;
+            color: #f59e0b;
+            background-color: rgba(245, 158, 11, 0.15);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
         .input-group {
             display: flex;
             flex-direction: column;
@@ -147,7 +183,7 @@
         #station-inspector {
             font-size: 13px;
             line-height: 1.5;
-            min-height: 80px;
+            min-height: 60px;
         }
 
         .inspector-placeholder {
@@ -158,7 +194,7 @@
 
         /* Log Output */
         #log {
-            height: 100px;
+            height: 90px;
             background-color: #020617;
             border: 1px solid #1e293b;
             border-radius: 4px;
@@ -230,7 +266,15 @@
         <div class="panel-section" style="border-color: #0284c7;">
             <h3>Station Inspector</h3>
             <div id="station-inspector">
-                <span class="inspector-placeholder">Hover over any station on the map to view real-time stats...</span>
+                <span class="inspector-placeholder">Hover over any station on the map...</span>
+            </div>
+        </div>
+
+        <!-- NEW: Live Top 5 Busiest Stations Leaderboard -->
+        <div class="panel-section" style="border-color: #f59e0b;">
+            <h3>Top 5 Demanding Stations</h3>
+            <div id="leaderboard" style="display: flex; flex-direction: column; gap: 6px;">
+                <span class="inspector-placeholder">Calculating demand...</span>
             </div>
         </div>
 
