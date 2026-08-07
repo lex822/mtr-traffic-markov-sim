@@ -11,7 +11,7 @@ const MTR_LINES = {
     "SIL": { name: "South Island Line", color: "#b6bd00", stations: ["Admiralty", "Ocean Park", "Wong Chuk Hang", "Lei Tung", "South Horizons"] }
 };
 
-// Coordinate map for all stations (normalized x, y)
+// Coordinate map for all stations
 const POS = {
     // Island Line
     "Kennedy Town": [0.52, 0.81], "HKU": [0.55, 0.81], "Sai Ying Pun": [0.58, 0.81], "Sheung Wan": [0.61, 0.81], "Central": [0.64, 0.81], "Admiralty": [0.68, 0.81], "Wan Chai": [0.72, 0.81], "Causeway Bay": [0.76, 0.81], "Tin Hau": [0.79, 0.81], "Fortress Hill": [0.81, 0.81], "North Point": [0.83, 0.78], "Quarry Bay": [0.86, 0.78], "Tai Koo": [0.88, 0.81], "Sai Wan Ho": [0.90, 0.81], "Shau Kei Wan": [0.92, 0.83], "Heng Fa Chuen": [0.94, 0.86], "Chai Wan": [0.95, 0.90],
@@ -31,7 +31,7 @@ const POS = {
     "Ocean Park": [0.70, 0.89], "Wong Chuk Hang": [0.67, 0.91], "Lei Tung": [0.66, 0.95], "South Horizons": [0.62, 0.95]
 };
 
-// Population Density Origin Weights across Hong Kong
+// Population Density Origin Weights
 const ALL_STATION_ORIGIN_WEIGHTS = {
     "Tuen Mun": 100, "Tin Shui Wai": 95, "Yuen Long": 90, "Sha Tin": 95, "Tai Wai": 90,
     "Tseung Kwan O": 85, "Hang Hau": 75, "Po Lam": 80, "Ma On Shan": 75,
@@ -66,7 +66,7 @@ const MAJOR_DESTINATIONS = [
     { station: "Exhibition Centre", weight: 0.06 }
 ];
 
-let canvas, ctx, stationInspector;
+let canvas, ctx, stationInspector, leaderboardEl;
 let graph = {}, stationQueues = {}, trains = [];
 let stationLines = {}; 
 let camera = { x: 0, y: 0, zoom: 1, isDragging: false, dragStart: { x: 0, y: 0 } };
@@ -210,6 +210,7 @@ function triggerNetworkWideDemand(baseScale = 3) {
     });
 
     log(`Spawning commute: +${totalSpawned.toLocaleString()} passengers generated!`);
+    updateLeaderboard();
 }
 
 function processBoardingAndAlighting(train, currentStationName) {
@@ -274,6 +275,35 @@ function updateAnalytics() {
             val.innerText = `${loadPct}%`;
         }
     });
+
+    updateLeaderboard();
+}
+
+// Live Top 5 Busiest Stations Leaderboard Update
+function updateLeaderboard() {
+    if (!leaderboardEl) return;
+
+    let sortedStations = Object.keys(stationQueues)
+        .map(st => ({ name: st, count: stationQueues[st].length }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+    if (sortedStations.length === 0 || sortedStations[0].count === 0) {
+        leaderboardEl.innerHTML = `<span class="inspector-placeholder">No waiting passengers in network.</span>`;
+        return;
+    }
+
+    let html = '';
+    sortedStations.forEach((st, idx) => {
+        html += `
+            <div class="leaderboard-row">
+                <span class="leaderboard-rank">#${idx + 1}</span>
+                <span class="leaderboard-name" title="${st.name}">${st.name}</span>
+                <span class="leaderboard-count">${st.count.toLocaleString()}</span>
+            </div>
+        `;
+    });
+    leaderboardEl.innerHTML = html;
 }
 
 function setupCameraPanZoom() {
@@ -303,7 +333,6 @@ function setupCameraPanZoom() {
             }
         });
 
-        // Update the Sidebar Station Inspector Panel
         if (hoverStation && stationInspector) {
             let qCount = (stationQueues[hoverStation] || []).length;
             let linesText = (stationLines[hoverStation] || []).join(', ');
@@ -319,7 +348,7 @@ function setupCameraPanZoom() {
             `;
         } else if (stationInspector) {
             stationInspector.innerHTML = `
-                <span class="inspector-placeholder">Hover over any station on the map to view real-time stats...</span>
+                <span class="inspector-placeholder">Hover over any station on the map...</span>
             `;
         }
     });
@@ -497,6 +526,7 @@ window.onload = () => {
     canvas = document.getElementById('cvs');
     ctx = canvas.getContext('2d');
     stationInspector = document.getElementById('station-inspector');
+    leaderboardEl = document.getElementById('leaderboard');
 
     initGraph();
     setupAnalyticsUI();
@@ -517,6 +547,7 @@ window.onload = () => {
         btnGo.onclick = () => {
             injectPassengers(s1.value, s2.value, parseInt(document.getElementById('pax').value) || 500);
             log(`+${document.getElementById('pax').value} waiting at ${s1.value} ➔ ${s2.value}`);
+            updateLeaderboard();
         };
     }
 
@@ -529,6 +560,7 @@ window.onload = () => {
             injectPassengers("Hung Hom", "Exhibition Centre", 800);
             injectPassengers("Tsim Sha Tsui", "Admiralty", 1000);
             log("Cross-Harbour surge injected!");
+            updateLeaderboard();
         };
     }
 
