@@ -50,7 +50,7 @@ function initGraph() {
             }
         }
 
-        // Spawn trains along line routes
+        // Forward Trains (Up-track)
         for (let i = 0; i < st.length - 1; i += 3) {
             trains.push({
                 line,
@@ -58,7 +58,20 @@ function initGraph() {
                 targetIdx: i + 1,
                 dir: 1,
                 prog: Math.random(),
-                spd: 0.005
+                spd: 0.003,
+                dwellTimer: 0
+            });
+        }
+        // Backward Trains (Down-track)
+        for (let i = st.length - 1; i > 0; i -= 3) {
+            trains.push({
+                line,
+                currIdx: i,
+                targetIdx: i - 1,
+                dir: -1,
+                prog: Math.random(),
+                spd: 0.003,
+                dwellTimer: 0
             });
         }
     });
@@ -253,7 +266,7 @@ function draw() {
         ctx.stroke();
     });
 
-    // 2. Render Traffic Heatmap Overlay
+    // 2. Render Traffic Heatmap
     Object.entries(edgeLoads).forEach(([k, load]) => {
         if (load <= 0) return;
         let [s1, s2] = k.split('--');
@@ -290,7 +303,7 @@ function draw() {
         }
     });
 
-    // 3. Draw Station Nodes
+    // 3. Draw Stations
     Object.values(POS).forEach(p => {
         ctx.beginPath();
         ctx.arc(p[0] * canvas.width, p[1] * canvas.height, 3.5 / camera.zoom, 0, Math.PI * 2);
@@ -298,7 +311,7 @@ function draw() {
         ctx.fill();
     });
 
-    // 4. Render Passenger Agents
+    // 4. Render Passengers Agents
     for (let i = agents.length - 1; i >= 0; i--) {
         let ag = agents[i];
         ag.prog += ag.spd;
@@ -318,40 +331,77 @@ function draw() {
         }
     }
 
-    // 5. Render Active Trains
+    // 5. Render Active Trains (Dual-Track + Station Stops + Smooth Capsules)
     trains.forEach(tr => {
         let stList = MTR_LINES[tr.line].stations;
-        tr.prog += tr.spd * tr.dir;
+        
+        // Handle Station Dwell Pause
+        if (tr.dwellTimer > 0) {
+            tr.dwellTimer -= 1;
+            let p = POS[stList[tr.currIdx]];
+            if (p) {
+                let offset = tr.dir * (3 / camera.zoom);
+                let x = p[0] * canvas.width + offset;
+                let y = p[1] * canvas.height + offset;
+
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(x, y, 4 / camera.zoom, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            return;
+        }
+
+        // Advance Train Position
+        tr.prog += tr.spd;
         if (tr.prog >= 1) {
             tr.prog = 0;
             tr.currIdx = tr.targetIdx;
             tr.targetIdx += tr.dir;
+            tr.dwellTimer = 40; // Station platform pause
+
             if (tr.targetIdx >= stList.length || tr.targetIdx < 0) {
                 tr.dir *= -1;
                 tr.targetIdx = tr.currIdx + tr.dir;
-            }
-        } else if (tr.prog <= 0 && tr.dir === -1) {
-            tr.prog = 1;
-            tr.currIdx = tr.targetIdx;
-            tr.targetIdx += tr.dir;
-            if (tr.targetIdx < 0) {
-                tr.dir *= -1;
-                tr.targetIdx = tr.currIdx + tr.dir;
+                tr.dwellTimer = 100; // Terminal turnaround pause
             }
         }
 
         let p1 = POS[stList[tr.currIdx]], p2 = POS[stList[tr.targetIdx]];
         if (p1 && p2) {
-            let x = (p1[0] + (p2[0] - p1[0]) * tr.prog) * canvas.width;
-            let y = (p1[1] + (p2[1] - p1[1]) * tr.prog) * canvas.height;
+            let x1 = p1[0] * canvas.width, y1 = p1[1] * canvas.height;
+            let x2 = p2[0] * canvas.width, y2 = p2[1] * canvas.height;
 
+            let dx = x2 - x1;
+            let dy = y2 - y1;
+            let len = Math.hypot(dx, dy) || 1;
+            
+            // Perpendicular offset for dual tracks
+            let nx = -dy / len * (3.5 / camera.zoom) * tr.dir;
+            let ny = dx / len * (3.5 / camera.zoom) * tr.dir;
+
+            let cx = (x1 + dx * tr.prog) + nx;
+            let cy = (y1 + dy * tr.prog) + ny;
+
+            let angle = Math.atan2(dy, dx);
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+
+            // Capsule Train Body
             ctx.fillStyle = MTR_LINES[tr.line].color;
             ctx.beginPath();
-            ctx.arc(x, y, 5 / camera.zoom, 0, Math.PI * 2);
+            ctx.roundRect(-6 / camera.zoom, -2.5 / camera.zoom, 12 / camera.zoom, 5 / camera.zoom, 3 / camera.zoom);
             ctx.fill();
-            ctx.strokeStyle = "#ffffff";
-            ctx.lineWidth = 1.5 / camera.zoom;
-            ctx.stroke();
+
+            // Headlight
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(4 / camera.zoom, 0, 1.5 / camera.zoom, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
         }
     });
 
