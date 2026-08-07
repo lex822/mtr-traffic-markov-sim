@@ -191,3 +191,18 @@ canvas:active { cursor: grabbing; }
     padding: 0 10px;
     font-size: 0.75rem;
 }
+#tooltip {
+    position: absolute;
+    display: none;
+    background: rgba(15, 23, 42, 0.9);
+    color: #ffffff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: sans-serif;
+    pointer-events: none;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    white-space: pre-line;
+    z-index: 1000;
+}
