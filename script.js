@@ -1,19 +1,34 @@
+// Official MTR Line Colors & Complete Network Data
 const MTR_LINES = {
-    "ISL": { name: "Island Line", color: "#007b3e", stations: ["Kennedy Town", "HKU", "Sai Ying Pun", "Sheung Wan", "Central", "Admiralty", "Wan Chai", "Causeway Bay", "Tin Hau", "Fortress Hill", "North Point", "Quarry Bay", "Tai Koo", "Sai Wan Ho", "Shau Kei Wan", "Heng Fa Chuen", "Chai Wan"] },
+    "ISL": { name: "Island Line", color: "#0071ce", stations: ["Kennedy Town", "HKU", "Sai Ying Pun", "Sheung Wan", "Central", "Admiralty", "Wan Chai", "Causeway Bay", "Tin Hau", "Fortress Hill", "North Point", "Quarry Bay", "Tai Koo", "Sai Wan Ho", "Shau Kei Wan", "Heng Fa Chuen", "Chai Wan"] },
     "TWL": { name: "Tsuen Wan Line", color: "#e60012", stations: ["Tsuen Wan", "Tai Wo Hau", "Kwai Hing", "Kwai Fong", "Lai King", "Mei Foo", "Lai Chi Kok", "Cheung Sha Wan", "Sham Shui Po", "Prince Edward", "Mong Kok", "Yau Ma Tei", "Jordan", "Tsim Sha Tsui", "Admiralty", "Central"] },
-    "KTL": { name: "Kwun Tong Line", color: "#00a0e9", stations: ["Whampoa", "Ho Man Tin", "Yau Ma Tei", "Mong Kok", "Prince Edward", "Shek Kip Mei", "Kowloon Tong", "Lok Fu", "Wong Tai Sin", "Diamond Hill", "Choi Hung", "Kowloon Bay", "Ngau Tau Kok", "Kwun Tong", "Lam Tin", "Yau Tong", "Tiu Keng Leng"] },
-    "EAL": { name: "East Rail Line", color: "#53b987", stations: ["Admiralty", "Exhibition Centre", "Hung Hom", "Mong Kok East", "Kowloon Tong", "Tai Wai", "Sha Tin", "Fo Tan", "University", "Tai Po Market", "Tai Wo", "Fanling", "Sheung Shui", "Lo Wu"] },
+    "KTL": { name: "Kwun Tong Line", color: "#009b3a", stations: ["Whampoa", "Ho Man Tin", "Yau Ma Tei", "Mong Kok", "Prince Edward", "Shek Kip Mei", "Kowloon Tong", "Lok Fu", "Wong Tai Sin", "Diamond Hill", "Choi Hung", "Kowloon Bay", "Ngau Tau Kok", "Kwun Tong", "Lam Tin", "Yau Tong", "Tiu Keng Leng"] },
+    "EAL": { name: "East Rail Line", color: "#5cba2c", stations: ["Admiralty", "Exhibition Centre", "Hung Hom", "Mong Kok East", "Kowloon Tong", "Tai Wai", "Sha Tin", "Fo Tan", "University", "Tai Po Market", "Tai Wo", "Fanling", "Sheung Shui", "Lo Wu"] },
     "TML": { name: "Tuen Ma Line", color: "#920783", stations: ["Tuen Mun", "Siu Hong", "Tin Shui Wai", "Long Ping", "Yuen Long", "Kam Sheung Road", "Tsuen Wan West", "Mei Foo", "Nam Cheong", "Austin", "East Tsim Sha Tsui", "Hung Hom", "Ho Man Tin", "To Kwa Wan", "Sung Wong Toi", "Kai Tak", "Diamond Hill", "Hin Keng", "Tai Wai", "Sha Tin Wai", "City One", "Shek Mun", "Tai Shui Hang", "Heng On", "Ma On Shan", "Wu Kai Sha"] },
-    "TKL": { name: "Tseung Kwan O Line", color: "#7d3f98", stations: ["North Point", "Quarry Bay", "Yau Tong", "Tiu Keng Leng", "Tseung Kwan O", "Hang Hau", "Po Lam"] }
+    "TKL": { name: "Tseung Kwan O Line", color: "#8d3f98", stations: ["North Point", "Quarry Bay", "Yau Tong", "Tiu Keng Leng", "Tseung Kwan O", "Hang Hau", "Po Lam"] },
+    "TCL": { name: "Tung Chung Line", color: "#fe7f00", stations: ["Hong Kong", "Kowloon", "Olympic", "Nam Cheong", "Lai King", "Tsing Yi", "Sunny Bay", "Tung Chung"] },
+    "AEL": { name: "Airport Express", color: "#008080", stations: ["Hong Kong", "Kowloon", "Tsing Yi", "Airport", "AsiaWorld-Expo"] },
+    "SIL": { name: "South Island Line", color: "#b6bd00", stations: ["Admiralty", "Ocean Park", "Wong Chuk Hang", "Lei Tung", "South Horizons"] }
 };
 
+// Coordinate map for all stations (normalized x, y)
 const POS = {
+    // Island Line
     "Kennedy Town": [0.52, 0.81], "HKU": [0.55, 0.81], "Sai Ying Pun": [0.58, 0.81], "Sheung Wan": [0.61, 0.81], "Central": [0.64, 0.81], "Admiralty": [0.68, 0.81], "Wan Chai": [0.72, 0.81], "Causeway Bay": [0.76, 0.81], "Tin Hau": [0.79, 0.81], "Fortress Hill": [0.81, 0.81], "North Point": [0.83, 0.78], "Quarry Bay": [0.86, 0.78], "Tai Koo": [0.88, 0.81], "Sai Wan Ho": [0.90, 0.81], "Shau Kei Wan": [0.92, 0.83], "Heng Fa Chuen": [0.94, 0.86], "Chai Wan": [0.95, 0.90],
+    // Tsuen Wan Line
     "Tsuen Wan": [0.48, 0.42], "Tai Wo Hau": [0.51, 0.45], "Kwai Hing": [0.53, 0.48], "Kwai Fong": [0.55, 0.51], "Lai King": [0.56, 0.55], "Mei Foo": [0.58, 0.59], "Lai Chi Kok": [0.60, 0.61], "Cheung Sha Wan": [0.62, 0.63], "Sham Shui Po": [0.64, 0.65], "Prince Edward": [0.66, 0.67], "Mong Kok": [0.66, 0.70], "Yau Ma Tei": [0.66, 0.73], "Jordan": [0.66, 0.76], "Tsim Sha Tsui": [0.66, 0.78],
+    // Kwun Tong Line
     "Whampoa": [0.74, 0.76], "Ho Man Tin": [0.71, 0.73], "Shek Kip Mei": [0.68, 0.64], "Kowloon Tong": [0.71, 0.61], "Lok Fu": [0.74, 0.61], "Wong Tai Sin": [0.77, 0.61], "Diamond Hill": [0.80, 0.61], "Choi Hung": [0.83, 0.63], "Kowloon Bay": [0.85, 0.66], "Ngau Tau Kok": [0.87, 0.68], "Kwun Tong": [0.89, 0.70], "Lam Tin": [0.91, 0.72], "Yau Tong": [0.91, 0.75], "Tiu Keng Leng": [0.93, 0.75],
+    // East Rail Line
     "Exhibition Centre": [0.70, 0.81], "Hung Hom": [0.70, 0.76], "Mong Kok East": [0.70, 0.68], "Tai Wai": [0.71, 0.53], "Sha Tin": [0.72, 0.47], "Fo Tan": [0.73, 0.42], "University": [0.74, 0.36], "Tai Po Market": [0.73, 0.28], "Tai Wo": [0.71, 0.24], "Fanling": [0.67, 0.17], "Sheung Shui": [0.63, 0.13], "Lo Wu": [0.58, 0.07],
+    // Tuen Ma Line
     "Tuen Mun": [0.15, 0.48], "Siu Hong": [0.15, 0.42], "Tin Shui Wai": [0.20, 0.30], "Long Ping": [0.25, 0.30], "Yuen Long": [0.30, 0.32], "Kam Sheung Road": [0.36, 0.36], "Tsuen Wan West": [0.46, 0.52], "Nam Cheong": [0.60, 0.66], "Austin": [0.64, 0.76], "East Tsim Sha Tsui": [0.68, 0.78], "To Kwa Wan": [0.75, 0.70], "Sung Wong Toi": [0.77, 0.67], "Kai Tak": [0.79, 0.65], "Hin Keng": [0.70, 0.56], "Sha Tin Wai": [0.74, 0.53], "City One": [0.77, 0.51], "Shek Mun": [0.80, 0.49], "Tai Shui Hang": [0.82, 0.44], "Heng On": [0.83, 0.40], "Ma On Shan": [0.84, 0.37], "Wu Kai Sha": [0.87, 0.35],
-    "Tseung Kwan O": [0.95, 0.73], "Hang Hau": [0.96, 0.69], "Po Lam": [0.96, 0.65]
+    // Tseung Kwan O Line
+    "Tseung Kwan O": [0.95, 0.73], "Hang Hau": [0.96, 0.69], "Po Lam": [0.96, 0.65],
+    // Tung Chung Line & Airport Express
+    "Hong Kong": [0.63, 0.81], "Kowloon": [0.62, 0.75], "Olympic": [0.61, 0.70], "Tsing Yi": [0.48, 0.56], "Sunny Bay": [0.32, 0.65], "Tung Chung": [0.12, 0.81], "Airport": [0.18, 0.75], "AsiaWorld-Expo": [0.14, 0.72],
+    // South Island Line
+    "Ocean Park": [0.70, 0.89], "Wong Chuk Hang": [0.67, 0.91], "Lei Tung": [0.66, 0.95], "South Horizons": [0.62, 0.95]
 };
 
 let canvas, ctx, tooltip;
@@ -60,6 +75,12 @@ function initGraph() {
             if (l1 !== l2) graph[`${s}|${l1}`].push({ n: `${s}|${l2}`, w: 3 });
         }));
     });
+
+    // Pedestrian transfer between Central and Hong Kong
+    (stMap["Central"] || []).forEach(l1 => (stMap["Hong Kong"] || []).forEach(l2 => {
+        graph[`Central|${l1}`].push({ n: `Hong Kong|${l2}`, w: 4 });
+        graph[`Hong Kong|${l2}`].push({ n: `Central|${l1}`, w: 4 });
+    }));
 }
 
 function findRoute(start, end) {
@@ -173,7 +194,6 @@ function setupCameraPanZoom() {
             camera.y = e.clientY - camera.dragStart.y;
         }
 
-        // Hover Tooltip Check
         const rect = canvas.getBoundingClientRect();
         const mx = (e.clientX - rect.left - camera.x) / camera.zoom;
         const my = (e.clientY - rect.top - camera.y) / camera.zoom;
@@ -218,7 +238,7 @@ function draw() {
 
     animPhase += 0.05;
 
-    // 1. Draw MTR Track Lines
+    // 1. Draw MTR Lines
     Object.values(MTR_LINES).forEach(line => {
         ctx.beginPath();
         for (let i = 0; i < line.stations.length - 1; i++) {
@@ -233,7 +253,7 @@ function draw() {
         ctx.stroke();
     });
 
-    // 2. Render Traffic Heatmap & Directional Chevrons
+    // 2. Render Traffic Heatmap Overlay
     Object.entries(edgeLoads).forEach(([k, load]) => {
         if (load <= 0) return;
         let [s1, s2] = k.split('--');
@@ -252,7 +272,6 @@ function draw() {
         ctx.stroke();
         ctx.globalAlpha = 1.0;
 
-        // Direction Pulse Arrow
         let dir = edgeDirections[k];
         if (dir) {
             let fromPos = POS[dir.from], toPos = POS[dir.to];
@@ -271,7 +290,7 @@ function draw() {
         }
     });
 
-    // 3. Draw Stations
+    // 3. Draw Station Nodes
     Object.values(POS).forEach(p => {
         ctx.beginPath();
         ctx.arc(p[0] * canvas.width, p[1] * canvas.height, 3.5 / camera.zoom, 0, Math.PI * 2);
@@ -279,7 +298,7 @@ function draw() {
         ctx.fill();
     });
 
-    // 4. Render Passengers Agents
+    // 4. Render Passenger Agents
     for (let i = agents.length - 1; i >= 0; i--) {
         let ag = agents[i];
         ag.prog += ag.spd;
@@ -383,7 +402,6 @@ window.onload = () => {
         log("Reset network loads.");
     };
 
-    // Clock / Time Slider Handler
     const slider = document.getElementById('time-slider');
     const clockDisplay = document.getElementById('clock-display');
     slider.oninput = (e) => {
