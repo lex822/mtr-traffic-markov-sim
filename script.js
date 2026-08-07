@@ -213,20 +213,54 @@ function triggerNetworkWideDemand(baseScale = 3) {
     updateLeaderboard();
 }
 
+// Automatic pedestrian transfer for the underground connection between Hong Kong and Central
+function processPedestrianTransfers() {
+    // Hong Kong -> Central
+    let hkQueue = stationQueues["Hong Kong"] || [];
+    for (let i = hkQueue.length - 1; i >= 0; i--) {
+        let pax = hkQueue[i];
+        if (pax.path[pax.pathIdx + 1] === "Central") {
+            pax.pathIdx++;
+            if (pax.destination !== "Central") {
+                stationQueues["Central"].push(pax);
+            }
+            hkQueue.splice(i, 1);
+        }
+    }
+
+    // Central -> Hong Kong
+    let centralQueue = stationQueues["Central"] || [];
+    for (let i = centralQueue.length - 1; i >= 0; i--) {
+        let pax = centralQueue[i];
+        if (pax.path[pax.pathIdx + 1] === "Hong Kong") {
+            pax.pathIdx++;
+            if (pax.destination !== "Hong Kong") {
+                stationQueues["Hong Kong"].push(pax);
+            }
+            centralQueue.splice(i, 1);
+        }
+    }
+}
+
 function processBoardingAndAlighting(train, currentStationName) {
+    // 1. Alight / Transfer passengers
     for (let i = train.passengers.length - 1; i >= 0; i--) {
         let pax = train.passengers[i];
         let nextTarget = pax.path[pax.pathIdx + 1];
         
         if (nextTarget === currentStationName || pax.destination === currentStationName) {
             pax.pathIdx++;
-            train.passengers.splice(i, 1);
+            train.passengers.splice(i, 1); // Remove from train
+            
+            // Re-queue ONLY if they haven't reached their final destination
             if (pax.destination !== currentStationName) {
                 stationQueues[currentStationName].push(pax);
             }
+            // If pax.destination === currentStationName, they exit the system completely
         }
     }
 
+    // 2. Board waiting passengers
     let queue = stationQueues[currentStationName] || [];
     let lineStations = MTR_LINES[train.line].stations;
     let nextStationInLine = lineStations[train.targetIdx];
@@ -279,7 +313,6 @@ function updateAnalytics() {
     updateLeaderboard();
 }
 
-// Live Top 5 Busiest Stations Leaderboard Update
 function updateLeaderboard() {
     if (!leaderboardEl) return;
 
@@ -382,6 +415,8 @@ function setupSpeedControls() {
 }
 
 function draw() {
+    processPedestrianTransfers();
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     ctx.translate(camera.x, camera.y);
