@@ -31,12 +31,39 @@ const POS = {
     "Ocean Park": [0.70, 0.89], "Wong Chuk Hang": [0.67, 0.91], "Lei Tung": [0.66, 0.95], "South Horizons": [0.62, 0.95]
 };
 
+// Demographic Weights (Major Residential Origins vs Commercial Destinations)
+const DEMOGRAPHICS = {
+    // High Density Residential Hubs (Origins)
+    origins: [
+        { station: "Tuen Mun", weight: 0.15 },
+        { station: "Sha Tin", weight: 0.14 },
+        { station: "Tseung Kwan O", weight: 0.12 },
+        { station: "Tai Wai", weight: 0.10 },
+        { station: "Tsuen Wan", weight: 0.09 },
+        { station: "Yuen Long", weight: 0.09 },
+        { station: "Po Lam", weight: 0.08 },
+        { station: "South Horizons", weight: 0.06 }
+    ],
+    // Major Employment & Commercial Hubs (Destinations)
+    destinations: [
+        { station: "Central", weight: 0.22 },
+        { station: "Admiralty", weight: 0.20 },
+        { station: "Wan Chai", weight: 0.14 },
+        { station: "Causeway Bay", weight: 0.12 },
+        { station: "Kowloon Bay", weight: 0.10 },
+        { station: "Kwun Tong", weight: 0.10 },
+        { station: "Tsim Sha Tsui", weight: 0.08 },
+        { station: "Quarry Bay", weight: 0.04 }
+    ]
+};
+
 let canvas, ctx, tooltip;
-let graph = {}, edgeLoads = {}, edgeDirections = {}, agents = [], trains = [];
+let graph = {}, stationQueues = {}, edgeLoads = {}, trains = [];
 let camera = { x: 0, y: 0, zoom: 1, isDragging: false, dragStart: { x: 0, y: 0 } };
-let animPhase = 0;
 
 function initGraph() {
+    Object.keys(POS).forEach(st => stationQueues[st] = []);
+
     Object.entries(MTR_LINES).forEach(([line, data]) => {
         let st = data.stations;
         for (let i = 0; i < st.length; i++) {
@@ -50,7 +77,7 @@ function initGraph() {
             }
         }
 
-        // Forward Trains (Up-track)
+        // Spawn Trains
         for (let i = 0; i < st.length - 1; i += 3) {
             trains.push({
                 line,
@@ -59,10 +86,11 @@ function initGraph() {
                 dir: 1,
                 prog: Math.random(),
                 spd: 0.003,
-                dwellTimer: 0
+                dwellTimer: 0,
+                passengers: [], // Passengers aboard this train
+                capacity: 500
             });
         }
-        // Backward Trains (Down-track)
         for (let i = st.length - 1; i > 0; i -= 3) {
             trains.push({
                 line,
@@ -71,7 +99,9 @@ function initGraph() {
                 dir: -1,
                 prog: Math.random(),
                 spd: 0.003,
-                dwellTimer: 0
+                dwellTimer: 0,
+                passengers: [],
+                capacity: 500
             });
         }
     });
@@ -89,7 +119,7 @@ function initGraph() {
         }));
     });
 
-    // Pedestrian transfer between Central and Hong Kong
+    // Central ↔ Hong Kong transfer passage
     (stMap["Central"] || []).forEach(l1 => (stMap["Hong Kong"] || []).forEach(l2 => {
         graph[`Central|${l1}`].push({ n: `Hong Kong|${l2}`, w: 4 });
         graph[`Hong Kong|${l2}`].push({ n: `Central|${l1}`, w: 4 });
@@ -110,7 +140,12 @@ function findRoute(start, end) {
         if (st === end) {
             let path = [];
             while (curr) { path.unshift(curr); curr = prev[curr]; }
-            return path;
+            let cleanPath = [];
+            path.forEach(n => {
+                let [s] = n.split('|');
+                if (cleanPath[cleanPath.length - 1] !== s) cleanPath.push(s);
+            });
+            return cleanPath;
         }
         (graph[curr] || []).forEach(edge => {
             let alt = dist[curr] + edge.w;
@@ -124,38 +159,67 @@ function findRoute(start, end) {
     return null;
 }
 
-function inject(start, end, count) {
+function injectPassengers(start, end, count) {
     let path = findRoute(start, end);
-    if (!path) { log(`Error: No route for ${start} -> ${end}`); return; }
+    if (!path || path.length < 2) return;
 
-    let cleanPath = [];
-    path.forEach(n => {
-        let [s] = n.split('|');
-        if (cleanPath[cleanPath.length - 1] !== s) cleanPath.push(s);
-    });
-
-    for (let i = 0; i < cleanPath.length - 1; i++) {
-        let key = [cleanPath[i], cleanPath[i+1]].sort().join('--');
-        edgeLoads[key] = (edgeLoads[key] || 0) + count;
-        edgeDirections[key] = { from: cleanPath[i], to: cleanPath[i+1] };
-    }
-
-    for (let i = 0; i < 30; i++) {
-        agents.push({
-            path: cleanPath,
-            idx: 0,
-            prog: Math.random() * 0.2,
-            spd: 0.006 + Math.random() * 0.004
+    for (let i = 0; i < count; i++) {
+        stationQueues[start].push({
+            origin: start,
+            destination: end,
+            path: path,
+            pathIdx: 0
         });
     }
-    log(`+${count} pax: ${start} ➔ ${end}`);
-    updateAnalytics();
+    log(`+${count} waiting at ${start} ➔ ${end}`);
 }
 
-function log(msg) {
-    let l = document.getElementById('log');
-    l.innerHTML += `<div>${msg}</div>`;
-    l.scrollTop = l.scrollHeight;
+function processBoardingAndAlighting(train, currentStationName) {
+    // 1. Alight Passengers
+    for (let i = train.passengers.length - 1; i >= 0; i--) {
+        let pax = train.passengers[i];
+        let nextTarget = pax.path[pax.pathIdx + 1];
+        
+        // If passenger reached destination or needs transfer at this station
+        if (nextTarget === currentStationName || pax.destination === currentStationName) {
+            pax.pathIdx++;
+            train.passengers.splice(i, 1);
+            if (pax.destination !== currentStationName) {
+                // Transfer: Add to current station queue for next line
+                stationQueues[currentStationName].push(pax);
+            }
+        }
+    }
+
+    // 2. Board Passengers from Station Queue
+    let queue = stationQueues[currentStationName] || [];
+    let lineStations = MTR_LINES[train.line].stations;
+    let nextStationInLine = lineStations[train.targetIdx];
+
+    for (let i = queue.length - 1; i >= 0; i--) {
+        if (train.passengers.length >= train.capacity) break; // Train full
+
+        let pax = queue[i];
+        let desiredNextStation = pax.path[pax.pathIdx + 1];
+
+        // Board if train is heading towards passenger's next target station
+        if (desiredNextStation === nextStationInLine) {
+            train.passengers.push(pax);
+            queue.splice(i, 1);
+        }
+    }
+}
+
+function triggerDemographicPeakCommute() {
+    DEMOGRAPHICS.origins.forEach(orig => {
+        DEMOGRAPHICS.destinations.forEach(dest => {
+            if (orig.station !== dest.station) {
+                let paxCount = Math.round(orig.weight * dest.weight * 3500);
+                injectPassengers(orig.station, dest.station, paxCount);
+            }
+        });
+    });
+    log("Morning Rush Peak Commute Injected!");
 }
 
 function setupAnalyticsUI() {
@@ -176,21 +240,16 @@ function setupAnalyticsUI() {
 
 function updateAnalytics() {
     Object.entries(MTR_LINES).forEach(([lineKey, lineData]) => {
-        let totalLoad = 0;
-        let count = 0;
-        for (let i = 0; i < lineData.stations.length - 1; i++) {
-            let key = [lineData.stations[i], lineData.stations[i+1]].sort().join('--');
-            if (edgeLoads[key]) {
-                totalLoad += edgeLoads[key];
-                count++;
-            }
-        }
-        let avg = count > 0 ? Math.min(Math.round((totalLoad / (count * 2000)) * 100), 100) : 0;
+        let lineTrains = trains.filter(t => t.line === lineKey);
+        let totalPax = lineTrains.reduce((sum, t) => sum + t.passengers.length, 0);
+        let totalCapacity = lineTrains.length * 500;
+        let loadPct = totalCapacity > 0 ? Math.min(Math.round((totalPax / totalCapacity) * 100), 100) : 0;
+
         let bar = document.getElementById(`bar-${lineKey}`);
         let val = document.getElementById(`val-${lineKey}`);
         if (bar && val) {
-            bar.style.width = `${avg}%`;
-            val.innerText = `${avg}%`;
+            bar.style.width = `${loadPct}%`;
+            val.innerText = `${loadPct}%`;
         }
     });
 }
@@ -221,10 +280,11 @@ function setupCameraPanZoom() {
         });
 
         if (found) {
+            let qCount = (stationQueues[found] || []).length;
             tooltip.style.display = 'block';
             tooltip.style.left = `${e.clientX + 12}px`;
             tooltip.style.top = `${e.clientY + 12}px`;
-            tooltip.innerText = `Station: ${found}`;
+            tooltip.innerText = `Station: ${found}\nWaiting Passengers: ${qCount}`;
         } else {
             tooltip.style.display = 'none';
         }
@@ -249,8 +309,6 @@ function draw() {
     ctx.translate(camera.x, camera.y);
     ctx.scale(camera.zoom, camera.zoom);
 
-    animPhase += 0.05;
-
     // 1. Draw MTR Lines
     Object.values(MTR_LINES).forEach(line => {
         ctx.beginPath();
@@ -266,78 +324,42 @@ function draw() {
         ctx.stroke();
     });
 
-    // 2. Render Traffic Heatmap
-    Object.entries(edgeLoads).forEach(([k, load]) => {
-        if (load <= 0) return;
-        let [s1, s2] = k.split('--');
-        let a = POS[s1], b = POS[s2];
-        if (!a || !b) return;
+    // 2. Draw Stations & Station Waiting Queues
+    Object.entries(POS).forEach(([name, p]) => {
+        let sx = p[0] * canvas.width, sy = p[1] * canvas.height;
+        let qLen = (stationQueues[name] || []).length;
 
-        let ax = a[0] * canvas.width, ay = a[1] * canvas.height;
-        let bx = b[0] * canvas.width, by = b[1] * canvas.height;
-
+        // Station Circle Base
         ctx.beginPath();
-        ctx.moveTo(ax, ay);
-        ctx.lineTo(bx, by);
-        ctx.strokeStyle = load > 1500 ? "#ef4444" : "#f59e0b";
-        ctx.lineWidth = (4 + Math.min(load / 200, 10)) / camera.zoom;
-        ctx.globalAlpha = 0.75;
-        ctx.stroke();
-        ctx.globalAlpha = 1.0;
-
-        let dir = edgeDirections[k];
-        if (dir) {
-            let fromPos = POS[dir.from], toPos = POS[dir.to];
-            if (fromPos && toPos) {
-                let fx = fromPos[0] * canvas.width, fy = fromPos[1] * canvas.height;
-                let tx = toPos[0] * canvas.width, ty = toPos[1] * canvas.height;
-                let t = (Math.sin(animPhase) + 1) / 2;
-                let cx = fx + (tx - fx) * t;
-                let cy = fy + (ty - fy) * t;
-
-                ctx.beginPath();
-                ctx.arc(cx, cy, 3 / camera.zoom, 0, Math.PI * 2);
-                ctx.fillStyle = "#ffffff";
-                ctx.fill();
-            }
-        }
-    });
-
-    // 3. Draw Stations
-    Object.values(POS).forEach(p => {
-        ctx.beginPath();
-        ctx.arc(p[0] * canvas.width, p[1] * canvas.height, 3.5 / camera.zoom, 0, Math.PI * 2);
+        ctx.arc(sx, sy, 3.5 / camera.zoom, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
+
+        // Platform Queue Ring Indicator (Grows with crowdedness)
+        if (qLen > 0) {
+            let ringRadius = (5 + Math.min(qLen / 20, 15)) / camera.zoom;
+            ctx.beginPath();
+            ctx.arc(sx, sy, ringRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = qLen > 300 ? "rgba(239, 68, 68, 0.8)" : "rgba(245, 158, 11, 0.7)";
+            ctx.lineWidth = 2 / camera.zoom;
+            ctx.stroke();
+        }
     });
 
-    // 4. Render Passengers Agents
-    for (let i = agents.length - 1; i >= 0; i--) {
-        let ag = agents[i];
-        ag.prog += ag.spd;
-        if (ag.prog >= 1) {
-            ag.prog = 0; ag.idx++;
-            if (ag.idx >= ag.path.length - 1) { agents.splice(i, 1); continue; }
-        }
-
-        let p1 = POS[ag.path[ag.idx]], p2 = POS[ag.path[ag.idx + 1]];
-        if (p1 && p2) {
-            let x = (p1[0] + (p2[0] - p1[0]) * ag.prog) * canvas.width;
-            let y = (p1[1] + (p2[1] - p1[1]) * ag.prog) * canvas.height;
-            ctx.beginPath();
-            ctx.arc(x, y, 2.5 / camera.zoom, 0, Math.PI * 2);
-            ctx.fillStyle = "#38bdf8";
-            ctx.fill();
-        }
-    }
-
-    // 5. Render Active Trains (Dual-Track + Station Stops + Smooth Capsules)
+    // 3. Render Active Trains & Passengers Inside
     trains.forEach(tr => {
         let stList = MTR_LINES[tr.line].stations;
         
-        // Handle Station Dwell Pause
+        // Handle Station Platform Dwell Pause
         if (tr.dwellTimer > 0) {
             tr.dwellTimer -= 1;
+            
+            // Process Boarding / Alighting once when train arrives at platform
+            if (tr.dwellTimer === 38) {
+                processBoardingAndAlighting(tr, stList[tr.currIdx]);
+                updateAnalytics();
+            }
+
             let p = POS[stList[tr.currIdx]];
             if (p) {
                 let offset = tr.dir * (3 / camera.zoom);
@@ -358,12 +380,13 @@ function draw() {
             tr.prog = 0;
             tr.currIdx = tr.targetIdx;
             tr.targetIdx += tr.dir;
-            tr.dwellTimer = 40; // Station platform pause
+            tr.dwellTimer = 40; // Platform stop dwell timer
 
+            // Terminal turnaround
             if (tr.targetIdx >= stList.length || tr.targetIdx < 0) {
                 tr.dir *= -1;
                 tr.targetIdx = tr.currIdx + tr.dir;
-                tr.dwellTimer = 100; // Terminal turnaround pause
+                tr.dwellTimer = 90;
             }
         }
 
@@ -376,7 +399,6 @@ function draw() {
             let dy = y2 - y1;
             let len = Math.hypot(dx, dy) || 1;
             
-            // Perpendicular offset for dual tracks
             let nx = -dy / len * (3.5 / camera.zoom) * tr.dir;
             let ny = dx / len * (3.5 / camera.zoom) * tr.dir;
 
@@ -389,17 +411,24 @@ function draw() {
             ctx.translate(cx, cy);
             ctx.rotate(angle);
 
-            // Capsule Train Body
+            // Train Capsule Body
             ctx.fillStyle = MTR_LINES[tr.line].color;
             ctx.beginPath();
-            ctx.roundRect(-6 / camera.zoom, -2.5 / camera.zoom, 12 / camera.zoom, 5 / camera.zoom, 3 / camera.zoom);
+            ctx.roundRect(-7 / camera.zoom, -3 / camera.zoom, 14 / camera.zoom, 6 / camera.zoom, 3 / camera.zoom);
             ctx.fill();
 
-            // Headlight
+            // Train Headlight
             ctx.fillStyle = "#ffffff";
             ctx.beginPath();
-            ctx.arc(4 / camera.zoom, 0, 1.5 / camera.zoom, 0, Math.PI * 2);
+            ctx.arc(5 / camera.zoom, 0, 1.5 / camera.zoom, 0, Math.PI * 2);
             ctx.fill();
+
+            // Passenger Capacity Indicator Bar (On top of train carriage)
+            let fullness = tr.passengers.length / tr.capacity;
+            if (fullness > 0) {
+                ctx.fillStyle = fullness > 0.8 ? "#ef4444" : "#38bdf8";
+                ctx.fillRect(-6 / camera.zoom, -4.5 / camera.zoom, (12 * fullness) / camera.zoom, 1.2 / camera.zoom);
+            }
 
             ctx.restore();
         }
@@ -407,6 +436,12 @@ function draw() {
 
     ctx.restore();
     requestAnimationFrame(draw);
+}
+
+function log(msg) {
+    let l = document.getElementById('log');
+    l.innerHTML += `<div>${msg}</div>`;
+    l.scrollTop = l.scrollHeight;
 }
 
 function resize() {
@@ -429,27 +464,26 @@ window.onload = () => {
     let keys = Object.keys(POS).sort();
     let s1 = document.getElementById('start'), s2 = document.getElementById('end');
     keys.forEach(k => { s1.add(new Option(k, k)); s2.add(new Option(k, k)); });
-    s1.value = "Tseung Kwan O"; s2.value = "Wan Chai";
+    s1.value = "Tuen Mun"; s2.value = "Central";
 
     document.getElementById('btn-go').onclick = () => {
-        inject(s1.value, s2.value, parseInt(document.getElementById('pax').value) || 500);
+        injectPassengers(s1.value, s2.value, parseInt(document.getElementById('pax').value) || 500);
     };
 
     document.getElementById('btn-rush').onclick = () => {
-        inject("Tuen Mun", "Central", 1500);
-        inject("Sha Tin", "Admiralty", 1800);
-        inject("Tseung Kwan O", "Wan Chai", 1400);
+        triggerDemographicPeakCommute();
     };
 
     document.getElementById('btn-cross').onclick = () => {
-        inject("Hung Hom", "Exhibition Centre", 2200);
-        inject("Tsim Sha Tsui", "Admiralty", 2500);
+        injectPassengers("Hung Hom", "Exhibition Centre", 800);
+        injectPassengers("Tsim Sha Tsui", "Admiralty", 1000);
     };
 
     document.getElementById('btn-clear').onclick = () => {
-        edgeLoads = {}; edgeDirections = {}; agents = [];
+        Object.keys(stationQueues).forEach(k => stationQueues[k] = []);
+        trains.forEach(t => t.passengers = []);
         updateAnalytics();
-        log("Reset network loads.");
+        log("Cleared all waiting station queues and onboard passengers.");
     };
 
     const slider = document.getElementById('time-slider');
