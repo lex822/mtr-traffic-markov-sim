@@ -31,39 +31,70 @@ const POS = {
     "Ocean Park": [0.70, 0.89], "Wong Chuk Hang": [0.67, 0.91], "Lei Tung": [0.66, 0.95], "South Horizons": [0.62, 0.95]
 };
 
-// Demographic Weights (Major Residential Origins vs Commercial Destinations)
-const DEMOGRAPHICS = {
-    origins: [
-        { station: "Tuen Mun", weight: 0.15 },
-        { station: "Sha Tin", weight: 0.14 },
-        { station: "Tseung Kwan O", weight: 0.12 },
-        { station: "Tai Wai", weight: 0.10 },
-        { station: "Tsuen Wan", weight: 0.09 },
-        { station: "Yuen Long", weight: 0.09 },
-        { station: "Po Lam", weight: 0.08 },
-        { station: "South Horizons", weight: 0.06 }
-    ],
-    destinations: [
-        { station: "Central", weight: 0.22 },
-        { station: "Admiralty", weight: 0.20 },
-        { station: "Wan Chai", weight: 0.14 },
-        { station: "Causeway Bay", weight: 0.12 },
-        { station: "Kowloon Bay", weight: 0.10 },
-        { station: "Kwun Tong", weight: 0.10 },
-        { station: "Tsim Sha Tsui", weight: 0.08 },
-        { station: "Quarry Bay", weight: 0.04 }
-    ]
+// Real-world dynamic origin weights for EVERY station across Hong Kong
+const ALL_STATION_ORIGIN_WEIGHTS = {
+    // New Territories Major Residential Hubs (High Output)
+    "Tuen Mun": 100, "Tin Shui Wai": 95, "Yuen Long": 90, "Sha Tin": 95, "Tai Wai": 90,
+    "Tseung Kwan O": 85, "Hang Hau": 75, "Po Lam": 80, "Tseung Kwan O": 85, "Ma On Shan": 75,
+    "Tsing Yi": 80, "Tung Chung": 80, "Tai Po Market": 75, "Fanling": 70, "Sheung Shui": 85,
+    "Siu Hong": 60, "Long Ping": 65, "Kam Sheung Road": 50, "Tsuen Wan West": 75,
+    "Sha Tin Wai": 50, "City One": 60, "Shek Mun": 55, "Tai Shui Hang": 45, "Heng On": 50,
+    "Wu Kai Sha": 60, "Hin Keng": 45, "Tai Wo": 55, "Fo Tan": 50, "University": 40, "Lo Wu": 70,
+
+    // Kowloon Residential & Commercial Mix
+    "Tsuen Wan": 85, "Tai Wo Hau": 50, "Kwai Hing": 60, "Kwai Fong": 80, "Lai King": 55,
+    "Mei Foo": 75, "Lai Chi Kok": 65, "Cheung Sha Wan": 65, "Sham Shui Po": 85, "Prince Edward": 70,
+    "Mong Kok": 90, "Yau Ma Tei": 75, "Jordan": 70, "Tsim Sha Tsui": 80, "Kowloon Tong": 85,
+    "Whampoa": 70, "Ho Man Tin": 55, "Shek Kip Mei": 60, "Lok Fu": 55, "Wong Tai Sin": 75,
+    "Diamond Hill": 80, "Choi Hung": 75, "Kowloon Bay": 75, "Ngau Tau Kok": 70, "Kwun Tong": 90,
+    "Lam Tin": 70, "Yau Tong": 65, "Tiu Keng Leng": 70, "Mong Kok East": 65, "Hung Hom": 80,
+    "To Kwa Wan": 65, "Sung Wong Toi": 55, "Kai Tak": 65, "Nam Cheong": 70, "Austin": 60,
+    "East Tsim Sha Tsui": 65, "Kowloon": 65, "Olympic": 70,
+
+    // Hong Kong Island Core & Residential
+    "Kennedy Town": 65, "HKU": 55, "Sai Ying Pun": 60, "Sheung Wan": 65, "Central": 75,
+    "Admiralty": 80, "Wan Chai": 75, "Causeway Bay": 80, "Tin Hau": 55, "Fortress Hill": 60,
+    "North Point": 75, "Quarry Bay": 70, "Tai Koo": 75, "Sai Wan Ho": 60, "Shau Kei Wan": 65,
+    "Heng Fa Chuen": 55, "Chai Wan": 75, "Exhibition Centre": 60, "Hong Kong": 70,
+    "Ocean Park": 30, "Wong Chuk Hang": 50, "Lei Tung": 60, "South Horizons": 70,
+    
+    // Airports & Leisure
+    "Sunny Bay": 25, "Airport": 45, "AsiaWorld-Expo": 20
 };
+
+// Major commercial and job centers (Destinations)
+const MAJOR_DESTINATIONS = [
+    { station: "Central", weight: 0.22 },
+    { station: "Admiralty", weight: 0.20 },
+    { station: "Wan Chai", weight: 0.14 },
+    { station: "Causeway Bay", weight: 0.12 },
+    { station: "Tsim Sha Tsui", weight: 0.12 },
+    { station: "Kwun Tong", weight: 0.10 },
+    { station: "Kowloon Bay", weight: 0.08 },
+    { station: "Quarry Bay", weight: 0.06 },
+    { station: "Exhibition Centre", weight: 0.06 }
+];
 
 let canvas, ctx, tooltip;
 let graph = {}, stationQueues = {}, trains = [];
+let stationLines = {}; 
 let camera = { x: 0, y: 0, zoom: 1, isDragging: false, dragStart: { x: 0, y: 0 } };
+let timeLapseSpeed = 1;
 
 function initGraph() {
-    Object.keys(POS).forEach(st => stationQueues[st] = []);
+    Object.keys(POS).forEach(st => {
+        stationQueues[st] = [];
+        stationLines[st] = [];
+    });
 
     Object.entries(MTR_LINES).forEach(([line, data]) => {
         let st = data.stations;
+        st.forEach(s => {
+            if (!stationLines[s].includes(data.name)) {
+                stationLines[s].push(data.name);
+            }
+        });
+
         for (let i = 0; i < st.length; i++) {
             let c = `${st[i]}|${line}`;
             graph[c] = graph[c] || [];
@@ -83,7 +114,7 @@ function initGraph() {
                 targetIdx: i + 1,
                 dir: 1,
                 prog: Math.random(),
-                spd: 0.003,
+                baseSpd: 0.003,
                 dwellTimer: 0,
                 passengers: [],
                 capacity: 500
@@ -96,7 +127,7 @@ function initGraph() {
                 targetIdx: i - 1,
                 dir: -1,
                 prog: Math.random(),
-                spd: 0.003,
+                baseSpd: 0.003,
                 dwellTimer: 0,
                 passengers: [],
                 capacity: 500
@@ -168,7 +199,27 @@ function injectPassengers(start, end, count) {
             pathIdx: 0
         });
     }
-    log(`+${count} waiting at ${start} ➔ ${end}`);
+}
+
+// Spawns passengers across EVERY SINGLE station using realistic station weights
+function triggerNetworkWideDemand(baseScale = 3) {
+    let totalSpawned = 0;
+
+    Object.keys(POS).forEach(originStation => {
+        let originWeight = ALL_STATION_ORIGIN_WEIGHTS[originStation] || 30;
+
+        MAJOR_DESTINATIONS.forEach(dest => {
+            if (originStation !== dest.station) {
+                let paxCount = Math.round((originWeight / 100) * dest.weight * baseScale * 40);
+                if (paxCount > 0) {
+                    injectPassengers(originStation, dest.station, paxCount);
+                    totalSpawned += paxCount;
+                }
+            }
+        });
+    });
+
+    log(`Spawning commute: +${totalSpawned.toLocaleString()} passengers generated across ALL stations!`);
 }
 
 function processBoardingAndAlighting(train, currentStationName) {
@@ -204,29 +255,18 @@ function processBoardingAndAlighting(train, currentStationName) {
     }
 }
 
-function triggerDemographicPeakCommute() {
-    DEMOGRAPHICS.origins.forEach(orig => {
-        DEMOGRAPHICS.destinations.forEach(dest => {
-            if (orig.station !== dest.station) {
-                let paxCount = Math.round(orig.weight * dest.weight * 3500);
-                injectPassengers(orig.station, dest.station, paxCount);
-            }
-        });
-    });
-    log("Morning Rush Peak Commute Injected!");
-}
-
 function setupAnalyticsUI() {
     let container = document.getElementById('utilization-bars');
+    if (!container) return;
     container.innerHTML = '';
     Object.entries(MTR_LINES).forEach(([key, line]) => {
         container.innerHTML += `
-            <div class="util-row">
-                <span style="width:70px; color:${line.color}; font-weight:bold">${line.name.split(' ')[0]}</span>
-                <div class="util-bar-bg">
-                    <div id="bar-${key}" class="util-bar-fill" style="background:${line.color}"></div>
+            <div class="util-row" style="display:flex; align-items:center; gap:8px; margin-bottom:4px; font-size:12px;">
+                <span style="width:80px; color:${line.color}; font-weight:bold">${line.name.split(' ')[0]}</span>
+                <div class="util-bar-bg" style="flex:1; background:#1e293b; height:8px; border-radius:4px; overflow:hidden;">
+                    <div id="bar-${key}" class="util-bar-fill" style="background:${line.color}; height:100%; width:0%; transition:width 0.2s;"></div>
                 </div>
-                <span id="val-${key}" style="width:30px; text-align:right">0%</span>
+                <span id="val-${key}" style="width:35px; text-align:right;">0%</span>
             </div>
         `;
     });
@@ -261,24 +301,34 @@ function setupCameraPanZoom() {
         }
 
         const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left - camera.x) / camera.zoom;
-        const my = (e.clientY - rect.top - camera.y) / camera.zoom;
+        const mouseWorldX = (e.clientX - rect.left - camera.x) / camera.zoom;
+        const mouseWorldY = (e.clientY - rect.top - camera.y) / camera.zoom;
 
-        let found = null;
+        let hoverStation = null;
+        const hitRadius = 12 / camera.zoom;
+
         Object.entries(POS).forEach(([name, p]) => {
             let sx = p[0] * canvas.width;
             let sy = p[1] * canvas.height;
-            if (Math.hypot(mx - sx, my - sy) < 8 / camera.zoom) {
-                found = name;
+            if (Math.hypot(mouseWorldX - sx, mouseWorldY - sy) < hitRadius) {
+                hoverStation = name;
             }
         });
 
-        if (found) {
-            let qCount = (stationQueues[found] || []).length;
+        if (hoverStation) {
+            let qCount = (stationQueues[hoverStation] || []).length;
+            let linesText = (stationLines[hoverStation] || []).join(', ');
+            let weight = ALL_STATION_ORIGIN_WEIGHTS[hoverStation] || 30;
+
             tooltip.style.display = 'block';
-            tooltip.style.left = `${e.clientX + 12}px`;
-            tooltip.style.top = `${e.clientY + 12}px`;
-            tooltip.innerText = `Station: ${found}\nWaiting Passengers: ${qCount}`;
+            tooltip.style.left = `${e.clientX + 14}px`;
+            tooltip.style.top = `${e.clientY + 14}px`;
+            tooltip.innerHTML = `
+                <strong style="color: #38bdf8; font-size:13px;">${hoverStation}</strong><br/>
+                <span style="color:#94a3b8; font-size:11px;">Lines: ${linesText}</span><br/>
+                <span style="color:#a855f7; font-size:11px;">Pop Density Factor: ${weight}</span><br/>
+                <span style="color:#f59e0b; font-weight:bold; font-size:12px;">Waiting Passengers: ${qCount.toLocaleString()}</span>
+            `;
         } else {
             tooltip.style.display = 'none';
         }
@@ -292,9 +342,24 @@ function setupCameraPanZoom() {
         camera.zoom = Math.min(Math.max(0.6, camera.zoom * zoomFactor), 4.0);
     });
 
-    document.getElementById('btn-zoom-in').onclick = () => camera.zoom = Math.min(camera.zoom * 1.2, 4.0);
-    document.getElementById('btn-zoom-out').onclick = () => camera.zoom = Math.max(camera.zoom * 0.8, 0.6);
-    document.getElementById('btn-zoom-reset').onclick = () => { camera.zoom = 1; camera.x = 0; camera.y = 0; };
+    let btnIn = document.getElementById('btn-zoom-in');
+    let btnOut = document.getElementById('btn-zoom-out');
+    let btnReset = document.getElementById('btn-zoom-reset');
+
+    if (btnIn) btnIn.onclick = () => camera.zoom = Math.min(camera.zoom * 1.2, 4.0);
+    if (btnOut) btnOut.onclick = () => camera.zoom = Math.max(camera.zoom * 0.8, 0.6);
+    if (btnReset) btnReset.onclick = () => { camera.zoom = 1; camera.x = 0; camera.y = 0; };
+}
+
+function setupSpeedControls() {
+    document.querySelectorAll('.btn-speed').forEach(btn => {
+        btn.onclick = (e) => {
+            document.querySelectorAll('.btn-speed').forEach(b => b.style.opacity = '0.6');
+            e.target.style.opacity = '1.0';
+            timeLapseSpeed = parseFloat(e.target.dataset.speed) || 1;
+            log(`Time Lapse Speed set to ${timeLapseSpeed}x`);
+        };
+    });
 }
 
 function draw() {
@@ -318,7 +383,7 @@ function draw() {
         ctx.stroke();
     });
 
-    // 2. Draw Stations & Station Queue Crowding Rings
+    // 2. Draw Stations & Station Queue Crowding Indicators
     Object.entries(POS).forEach(([name, p]) => {
         let sx = p[0] * canvas.width, sy = p[1] * canvas.height;
         let qLen = (stationQueues[name] || []).length;
@@ -329,7 +394,7 @@ function draw() {
         ctx.fillStyle = "#ffffff";
         ctx.fill();
 
-        // Queue Ring Indicator (Only appears if passengers are queued at station)
+        // Crowding Ring (Appears proportional to queue count at ANY station)
         if (qLen > 0) {
             let ringRadius = (5 + Math.min(qLen / 20, 15)) / camera.zoom;
             ctx.beginPath();
@@ -340,14 +405,15 @@ function draw() {
         }
     });
 
-    // 3. Render Active Trains & Internal Passenger Load (No loose gliding dots on map)
+    // 3. Render Active Trains
     trains.forEach(tr => {
         let stList = MTR_LINES[tr.line].stations;
+        let speed = tr.baseSpd * timeLapseSpeed;
         
         if (tr.dwellTimer > 0) {
-            tr.dwellTimer -= 1;
+            tr.dwellTimer -= 1 * timeLapseSpeed;
             
-            if (tr.dwellTimer === 38) {
+            if (tr.dwellTimer <= 38 && tr.dwellTimer + (1 * timeLapseSpeed) > 38) {
                 processBoardingAndAlighting(tr, stList[tr.currIdx]);
                 updateAnalytics();
             }
@@ -366,7 +432,7 @@ function draw() {
             return;
         }
 
-        tr.prog += tr.spd;
+        tr.prog += speed;
         if (tr.prog >= 1) {
             tr.prog = 0;
             tr.currIdx = tr.targetIdx;
@@ -401,7 +467,7 @@ function draw() {
             ctx.translate(cx, cy);
             ctx.rotate(angle);
 
-            // Train Carriage Body
+            // Train Body
             ctx.fillStyle = MTR_LINES[tr.line].color;
             ctx.beginPath();
             ctx.roundRect(-7 / camera.zoom, -3 / camera.zoom, 14 / camera.zoom, 6 / camera.zoom, 3 / camera.zoom);
@@ -413,7 +479,7 @@ function draw() {
             ctx.arc(5 / camera.zoom, 0, 1.5 / camera.zoom, 0, Math.PI * 2);
             ctx.fill();
 
-            // Top Passenger Load Bar (Shows how full the train is)
+            // Top Occupancy Load Bar
             let fullness = tr.passengers.length / tr.capacity;
             if (fullness > 0) {
                 ctx.fillStyle = fullness > 0.8 ? "#ef4444" : "#38bdf8";
@@ -430,12 +496,14 @@ function draw() {
 
 function log(msg) {
     let l = document.getElementById('log');
+    if (!l) return;
     l.innerHTML += `<div>${msg}</div>`;
     l.scrollTop = l.scrollHeight;
 }
 
 function resize() {
     let p = document.getElementById('viewport');
+    if (!p) return;
     canvas.width = p.clientWidth;
     canvas.height = p.clientHeight;
 }
@@ -449,43 +517,63 @@ window.onload = () => {
     setupAnalyticsUI();
     resize();
     setupCameraPanZoom();
+    setupSpeedControls();
     window.onresize = resize;
 
     let keys = Object.keys(POS).sort();
     let s1 = document.getElementById('start'), s2 = document.getElementById('end');
-    keys.forEach(k => { s1.add(new Option(k, k)); s2.add(new Option(k, k)); });
-    s1.value = "Tuen Mun"; s2.value = "Central";
+    if (s1 && s2) {
+        keys.forEach(k => { s1.add(new Option(k, k)); s2.add(new Option(k, k)); });
+        s1.value = "Tuen Mun"; s2.value = "Central";
+    }
 
-    document.getElementById('btn-go').onclick = () => {
-        injectPassengers(s1.value, s2.value, parseInt(document.getElementById('pax').value) || 500);
-    };
+    let btnGo = document.getElementById('btn-go');
+    if (btnGo) {
+        btnGo.onclick = () => {
+            injectPassengers(s1.value, s2.value, parseInt(document.getElementById('pax').value) || 500);
+            log(`+${document.getElementById('pax').value} waiting at ${s1.value} ➔ ${s2.value}`);
+        };
+    }
 
-    document.getElementById('btn-rush').onclick = () => {
-        triggerDemographicPeakCommute();
-    };
+    let btnRush = document.getElementById('btn-rush');
+    if (btnRush) {
+        btnRush.onclick = () => triggerNetworkWideDemand(3);
+    }
 
-    document.getElementById('btn-cross').onclick = () => {
-        injectPassengers("Hung Hom", "Exhibition Centre", 800);
-        injectPassengers("Tsim Sha Tsui", "Admiralty", 1000);
-    };
+    let btnCross = document.getElementById('btn-cross');
+    if (btnCross) {
+        btnCross.onclick = () => {
+            injectPassengers("Hung Hom", "Exhibition Centre", 800);
+            injectPassengers("Tsim Sha Tsui", "Admiralty", 1000);
+            log("Cross-Harbour peak surge injected!");
+        };
+    }
 
-    document.getElementById('btn-clear').onclick = () => {
-        Object.keys(stationQueues).forEach(k => stationQueues[k] = []);
-        trains.forEach(t => t.passengers = []);
-        updateAnalytics();
-        log("Cleared all waiting station queues and onboard passengers.");
-    };
+    let btnClear = document.getElementById('btn-clear');
+    if (btnClear) {
+        btnClear.onclick = () => {
+            Object.keys(stationQueues).forEach(k => stationQueues[k] = []);
+            trains.forEach(t => t.passengers = []);
+            updateAnalytics();
+            log("Cleared all waiting station queues and onboard passengers.");
+        };
+    }
 
     const slider = document.getElementById('time-slider');
     const clockDisplay = document.getElementById('clock-display');
-    slider.oninput = (e) => {
-        let mins = parseInt(e.target.value);
-        let h = Math.floor(mins / 60);
-        let m = mins % 60;
-        let ampm = h >= 12 ? 'PM' : 'AM';
-        let displayH = h % 12 === 0 ? 12 : h % 12;
-        clockDisplay.innerText = `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
-    };
+    if (slider && clockDisplay) {
+        slider.oninput = (e) => {
+            let mins = parseInt(e.target.value);
+            let h = Math.floor(mins / 60);
+            let m = mins % 60;
+            let ampm = h >= 12 ? 'PM' : 'AM';
+            let displayH = h % 12 === 0 ? 12 : h % 12;
+            clockDisplay.innerText = `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+        };
+    }
+
+    // Automatically trigger initial population across every station on load
+    triggerNetworkWideDemand(1.5);
 
     draw();
 };
