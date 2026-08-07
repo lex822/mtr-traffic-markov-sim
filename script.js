@@ -33,7 +33,6 @@ const POS = {
 
 // Demographic Weights (Major Residential Origins vs Commercial Destinations)
 const DEMOGRAPHICS = {
-    // High Density Residential Hubs (Origins)
     origins: [
         { station: "Tuen Mun", weight: 0.15 },
         { station: "Sha Tin", weight: 0.14 },
@@ -44,7 +43,6 @@ const DEMOGRAPHICS = {
         { station: "Po Lam", weight: 0.08 },
         { station: "South Horizons", weight: 0.06 }
     ],
-    // Major Employment & Commercial Hubs (Destinations)
     destinations: [
         { station: "Central", weight: 0.22 },
         { station: "Admiralty", weight: 0.20 },
@@ -58,7 +56,7 @@ const DEMOGRAPHICS = {
 };
 
 let canvas, ctx, tooltip;
-let graph = {}, stationQueues = {}, edgeLoads = {}, trains = [];
+let graph = {}, stationQueues = {}, trains = [];
 let camera = { x: 0, y: 0, zoom: 1, isDragging: false, dragStart: { x: 0, y: 0 } };
 
 function initGraph() {
@@ -87,7 +85,7 @@ function initGraph() {
                 prog: Math.random(),
                 spd: 0.003,
                 dwellTimer: 0,
-                passengers: [], // Passengers aboard this train
+                passengers: [],
                 capacity: 500
             });
         }
@@ -119,7 +117,6 @@ function initGraph() {
         }));
     });
 
-    // Central ↔ Hong Kong transfer passage
     (stMap["Central"] || []).forEach(l1 => (stMap["Hong Kong"] || []).forEach(l2 => {
         graph[`Central|${l1}`].push({ n: `Hong Kong|${l2}`, w: 4 });
         graph[`Hong Kong|${l2}`].push({ n: `Central|${l1}`, w: 4 });
@@ -180,12 +177,10 @@ function processBoardingAndAlighting(train, currentStationName) {
         let pax = train.passengers[i];
         let nextTarget = pax.path[pax.pathIdx + 1];
         
-        // If passenger reached destination or needs transfer at this station
         if (nextTarget === currentStationName || pax.destination === currentStationName) {
             pax.pathIdx++;
             train.passengers.splice(i, 1);
             if (pax.destination !== currentStationName) {
-                // Transfer: Add to current station queue for next line
                 stationQueues[currentStationName].push(pax);
             }
         }
@@ -197,12 +192,11 @@ function processBoardingAndAlighting(train, currentStationName) {
     let nextStationInLine = lineStations[train.targetIdx];
 
     for (let i = queue.length - 1; i >= 0; i--) {
-        if (train.passengers.length >= train.capacity) break; // Train full
+        if (train.passengers.length >= train.capacity) break;
 
         let pax = queue[i];
         let desiredNextStation = pax.path[pax.pathIdx + 1];
 
-        // Board if train is heading towards passenger's next target station
         if (desiredNextStation === nextStationInLine) {
             train.passengers.push(pax);
             queue.splice(i, 1);
@@ -324,18 +318,18 @@ function draw() {
         ctx.stroke();
     });
 
-    // 2. Draw Stations & Station Waiting Queues
+    // 2. Draw Stations & Station Queue Crowding Rings
     Object.entries(POS).forEach(([name, p]) => {
         let sx = p[0] * canvas.width, sy = p[1] * canvas.height;
         let qLen = (stationQueues[name] || []).length;
 
-        // Station Circle Base
+        // Base station circle
         ctx.beginPath();
         ctx.arc(sx, sy, 3.5 / camera.zoom, 0, Math.PI * 2);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
 
-        // Platform Queue Ring Indicator (Grows with crowdedness)
+        // Queue Ring Indicator (Only appears if passengers are queued at station)
         if (qLen > 0) {
             let ringRadius = (5 + Math.min(qLen / 20, 15)) / camera.zoom;
             ctx.beginPath();
@@ -346,15 +340,13 @@ function draw() {
         }
     });
 
-    // 3. Render Active Trains & Passengers Inside
+    // 3. Render Active Trains & Internal Passenger Load (No loose gliding dots on map)
     trains.forEach(tr => {
         let stList = MTR_LINES[tr.line].stations;
         
-        // Handle Station Platform Dwell Pause
         if (tr.dwellTimer > 0) {
             tr.dwellTimer -= 1;
             
-            // Process Boarding / Alighting once when train arrives at platform
             if (tr.dwellTimer === 38) {
                 processBoardingAndAlighting(tr, stList[tr.currIdx]);
                 updateAnalytics();
@@ -374,15 +366,13 @@ function draw() {
             return;
         }
 
-        // Advance Train Position
         tr.prog += tr.spd;
         if (tr.prog >= 1) {
             tr.prog = 0;
             tr.currIdx = tr.targetIdx;
             tr.targetIdx += tr.dir;
-            tr.dwellTimer = 40; // Platform stop dwell timer
+            tr.dwellTimer = 40;
 
-            // Terminal turnaround
             if (tr.targetIdx >= stList.length || tr.targetIdx < 0) {
                 tr.dir *= -1;
                 tr.targetIdx = tr.currIdx + tr.dir;
@@ -411,19 +401,19 @@ function draw() {
             ctx.translate(cx, cy);
             ctx.rotate(angle);
 
-            // Train Capsule Body
+            // Train Carriage Body
             ctx.fillStyle = MTR_LINES[tr.line].color;
             ctx.beginPath();
             ctx.roundRect(-7 / camera.zoom, -3 / camera.zoom, 14 / camera.zoom, 6 / camera.zoom, 3 / camera.zoom);
             ctx.fill();
 
-            // Train Headlight
+            // Headlight
             ctx.fillStyle = "#ffffff";
             ctx.beginPath();
             ctx.arc(5 / camera.zoom, 0, 1.5 / camera.zoom, 0, Math.PI * 2);
             ctx.fill();
 
-            // Passenger Capacity Indicator Bar (On top of train carriage)
+            // Top Passenger Load Bar (Shows how full the train is)
             let fullness = tr.passengers.length / tr.capacity;
             if (fullness > 0) {
                 ctx.fillStyle = fullness > 0.8 ? "#ef4444" : "#38bdf8";
